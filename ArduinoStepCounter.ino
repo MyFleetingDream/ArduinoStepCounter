@@ -2,17 +2,19 @@
 #include <Adafruit_Circuit_Playground.h>
 
 #define WINDOW_LENGTH 30
-#define MOVING_AVERAGE_LENGTH 7
-#define ACCEL_THRESHOLD 11.5
+#define ACCEL_THRESHOLD 11.2
+#define INITIAL_ACCEL 10
+#define ALPHA 0.5
 
 volatile boolean updateFlag;
+volatile byte numSteps;
 
 //Frequency at which the various LEDs/sensor-reads update in Hz
 byte updateFrequency = 50;
 byte ledFrequency = 1;
 byte colorUpdateFrequency = 20;
 
-byte numSteps;
+//byte numSteps;
 byte ledDelay;
 byte ledDelayCounter;
 byte colorUpdateDelay;
@@ -21,12 +23,8 @@ byte colorWheelValue;
 
 //Impelmenting our window as a circular buffer to reduce the number of writes when the buffer is full (which is always)
 float window[WINDOW_LENGTH];
-byte windowHead; // If tail == head, then the buffer is empty. If head == tail - 11, then the buffer is full
+byte windowHead; // If tail == head, then the buffer is empty. If head == tail - 1, then the buffer is full
 byte windowTail;
-
-//float movingAverageCalculator[MOVING_AVERAGE_LENGTH];
-//byte mAHead;
-//byte mATail;
 
 //add a new entry into our window
 void addToWindow(float * win, float data)
@@ -69,7 +67,7 @@ byte windowDataCount()
 float windowMidpoint(float * win)
 {
   //ignore if our window isn't full
-  if (windowHead = windowTail - 1)
+  if (windowHead == windowTail - 1)
   {
     return win[(windowHead + WINDOW_LENGTH / 2) % WINDOW_LENGTH];
   }
@@ -92,9 +90,13 @@ void setup()
   windowHead = 0;
   windowTail = 0;
 
-  Serial.begin(9600);
+  for (int i = 0; i < WINDOW_LENGTH; i++)
+  {
+    addToWindow(window, INITIAL_ACCEL);
+  }
 
-  attachInterrupt(digitalPinToInterrupt(CPLAY_LEFTBUTTON), resetPinIsr, CHANGE);
+  Serial.begin(9600);
+  
   noInterrupts();           // disable all interrupts
   TCCR1A = 0;
   TCCR1B = 0;
@@ -129,29 +131,29 @@ void loop()
       ledDelayCounter = 0;
     }
 
-    float x, y, z, mag;
+    float x, y, z, mag, next;
     x = CircuitPlayground.motionX();
     y = CircuitPlayground.motionY();
     z = CircuitPlayground.motionZ();
     mag = sqrt(sq(x) + sq(y) + sq(z));
-//    Serial.print("x: "); Serial.println(x);
-//    Serial.print("y: "); Serial.println(y);
-//    Serial.print("z: "); Serial.println(z);
-//    Serial.print("mag: "); Serial.println(mag);
-    addToWindow(window, mag);
-//    Serial.print("Current head: "); Serial.println(window[windowHead]);
+    //    Serial.print("x: "); Serial.println(x);
+    //    Serial.print("y: "); Serial.println(y);
+    //    Serial.print("z: "); Serial.println(z);
+    //    Serial.print("mag: "); Serial.println(mag);
+    next = mag * ALPHA + window[windowHead] * (1 - ALPHA);
+//    Serial.print("Mag: "); Serial.println(mag);
+//    Serial.print("window[windowHead]: "); Serial.println(window[windowHead]);
+//    Serial.print("windowTail: "); Serial.println(windowTail);
+//    Serial.print("windowHead: "); Serial.println(windowHead);
+//    Serial.print("Next: "); Serial.println(next);
+    addToWindow(window, next);
 
     float midpoint = windowMidpoint(window);
-//    Serial.print("Current midpoint: "); Serial.println(midpoint);
-
-//    for (int i = 0; i < WINDOW_LENGTH; i++)
-//    {
-//      Serial.print("window["); Serial.print(i); Serial.print("]: "); Serial.println(window[i]);
-//    }
+    //    Serial.print("Current midpoint: "); Serial.println(midpoint);
 
     if (midpoint > ACCEL_THRESHOLD)
     {
-//      Serial.println("Midpoint is greater than threshold");
+      //      Serial.println("Midpoint is greater than threshold");
       bool isMax = true;
       for (int i = 0; i < WINDOW_LENGTH; i++)
       {
@@ -182,11 +184,6 @@ void loop()
   }
 }
 
-void resetPinIsr ()
-{
-  numSteps = 0;
-  Serial.println("Number of steps reset to 0");
-}
 
 void setPixels(byte number)
 {
