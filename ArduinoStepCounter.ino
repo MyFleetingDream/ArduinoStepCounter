@@ -3,7 +3,7 @@
 
 #define WINDOW_LENGTH 30
 #define MOVING_AVERAGE_LENGTH 7
-#define ACCEL_THRESHOLD 12
+#define ACCEL_THRESHOLD 11.5
 
 volatile boolean updateFlag;
 
@@ -170,6 +170,10 @@ void loop()
       {
         numSteps++;
         Serial.print("Number of steps: "); Serial.println(numSteps);
+        if (!CircuitPlayground.slideSwitch())
+        {
+          CircuitPlayground.playTone(440, 100);
+        }
       }
     }
     setPixels(numSteps);
